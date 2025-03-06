@@ -1,2 +1,10 @@
 node_modules/
 dist/
+chroma_db/all_parts
+*.pyc
+*/__pycache__/*
+*.DS_Store
+*.env
+*httpcache*
+*.vscode
+*.idea

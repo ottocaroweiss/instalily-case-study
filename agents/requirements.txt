@@ -1,0 +1,10 @@
+fastapi==0.115.11
+langchain_community==0.3.19
+langchain_core==0.3.41
+langchain_deepseek==0.1.2
+pydantic==2.10.6
+python-dotenv==1.0.1
+scraping==0.0.3
+sse_starlette==2.2.1
+tqdm==4.65.0
+uvicorn==0.34.0

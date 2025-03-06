@@ -1,0 +1,158 @@
+@import "rsuite/dist/rsuite.css";
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 2px;
+  font-size: 0.9em;
+  margin-top: 60px; 
+  margin-bottom: 70px; 
+}
+
+.user-message-container,
+.assistant-message-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  margin: 4px 0;
+}
+
+.user-message-container {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.assistant-message-container {
+  align-items: flex-start;
+  align-self: flex-start;
+}
+
+.message {
+  white-space: pre-line;
+  padding: 14px;
+  margin: 2px 0;
+  border-radius: 10px;
+  clear: both;
+  font-size:  0.9em;;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.user-message {
+  align-self: flex-end;
+  background-color: #337778;
+  color: #ffffff;
+  border-top-right-radius: 0;
+  text-align: left;
+}
+
+.assistant-message {
+  align-self: flex-start;
+  background-color: #e8851b;
+  border-top-left-radius: 0;
+  color: #ffffff;
+  width: 70vw;
+  box-sizing: border-box;
+}
+
+.assistant-message a {
+  color: #337778;
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .assistant-message {
+    width: 90vw;
+  }
+}
+
+.assistant-message a:hover,
+.assistant-message a:focus {
+  color: #0f4142;
+  text-decoration: underline;
+}
+
+.loader-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #e8851b;
+  border-radius: 5em;
+  width: 50vw;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid #337778;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+.input-area {
+  font-size:  0.9em;
+  padding: 10px;
+  bottom: 0;
+  width: 100vw;
+  display: flex;
+  border-top: 1px solid #ccc;
+  background: #fff;
+  position: fixed;
+  width: calc(100% - 40px);
+}
+
+.input-area textarea {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  resize: none;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: 200px;
+  margin-right: 10px;
+}
+
+.input-area input {
+  flex: 1;
+  padding: 10px;
+  margin-right: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+
+
+.input-area button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  background-color: #337778;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  font-size:  0.9em;
+}
+
+.input-area:focus {
+  outline-color: #337778;
+  box-shadow: 0 0 0 2px rgba(232, 133, 27, 0.5);
+}
