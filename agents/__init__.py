@@ -6,16 +6,7 @@ import uuid
 from typing import Dict
 from fastapi.responses import StreamingResponse
 from agents.main_agent import MainAgent
-from agents.my_tools import (
-    search_all_customer_text_on_individual_part_tool,
-    search_customer_support_on_individual_part_tool,
-    get_part_by_id,
-    get_appliance_by_id,
-    check_model_part_compatibility,
-    scrape_model_symptoms,
-    search_parts_of_an_appliance
-)
-
+from agents.utils import save_prompt
 import logging
 # Set up logging
 logging.basicConfig(
@@ -38,7 +29,6 @@ class ChatRequest(BaseModel):
     session_id: str = None
     user_input: str
 
-
 SESSIONS = {}
 MAIN_MEMORY: Dict[str, MainAgent] = {}
 
@@ -47,23 +37,12 @@ def get_or_create_session(session_id: str):
         session_id = str(uuid.uuid4())
 
     if session_id not in SESSIONS:
-        main_agent = MainAgent([
-            search_all_parts_tool,
-            search_all_customer_text_on_individual_part_tool,
-            search_customer_support_on_individual_part_tool,
-            get_part_by_id,
-            get_appliance_by_id,
-            check_model_part_compatibility,
-            scrape_model_symptoms,
-            search_parts_of_an_appliance
-        ])
+        main_agent = MainAgent()
         SESSIONS[session_id] = {
             "main_agent": main_agent
         }
 
     return session_id, SESSIONS[session_id]
-
-
 
 
 @app.get("/chat-stream")
@@ -84,7 +63,7 @@ def chat_endpoint(req: ChatRequest):
     main_agent: MainAgent = session["main_agent"]
 
     main_reply = main_agent.run(req.user_input)
-    logging.info(f"CONVERSATION THUS FAR: {main_agent.conversation}")
+    save_prompt(session_id, req.user_input)
     
     return {
         "session_id": session_id,

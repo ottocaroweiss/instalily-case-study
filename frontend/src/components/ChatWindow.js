@@ -13,10 +13,31 @@ function ChatWindow() {
   const [loading, setLoading] = useState(false); // For showing a loader/spinner
 
   const messagesEndRef = useRef(null);
+  function removeDoubleBlankLines(text) {
+    // This regex finds a newline followed by any amount of whitespace, 
+    // then another newline, and replaces it with a single newline
+
+    return text.replace(/\n\s*\n/g, "\n");
+  }
+
+
+  function cleanedMessage({ message }) {
+    const sanitizedContent = removeDoubleBlankLines(message.content);
+    return (
+      <ReactMarkdown
+        components={{
+          ul: ({ node, ...props }) => <>{props.children}</>, // Remove the <ul> wrapper
+          li: ({ node, ...props }) => <p {...props} />,      // Render <li> content as <p>
+        }}
+      >
+        {sanitizedContent}
+      </ReactMarkdown>
+    );
+  }
 
   // On mount, create/store user ID if none exists yet
   useEffect(() => {
-    let userId;//localStorage.getItem("chatUserId");
+    let userId; // = localStorage.getItem("chatUserId");
     if (!userId) {
       // Generate a random ID
       userId = Math.random().toString(36).substring(2, 11);
@@ -114,7 +135,7 @@ function ChatWindow() {
             />
           )}
           <div className={`message ${message.role}-message`}>
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+          {cleanedMessage({ message })}
           </div>
         </div>
       ))}

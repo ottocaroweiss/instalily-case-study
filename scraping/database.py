@@ -76,7 +76,6 @@ class DatabaseHandler:
             cls=PartReviewItem,
             table_name="part_reviews",
             primary_key="review_id",
-            auto_increment_pk=True
         )
         self.cursor.execute(create_reviews_sql)
         
@@ -94,7 +93,6 @@ class DatabaseHandler:
             cls=PartReviewStoryItem,
             table_name="part_review_stories",
             primary_key="story_id",
-            auto_increment_pk=True
         )
         self.cursor.execute(create_stories_sql)
 
@@ -110,7 +108,6 @@ class DatabaseHandler:
             cls=PartQnAItem,
             table_name="part_qna",
             primary_key="qna_id",
-            auto_increment_pk=True
         )
         self.cursor.execute(create_qna_sql)
 

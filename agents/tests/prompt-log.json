@@ -1,0 +1,118 @@
+{
+  "default-session": [
+    {
+      "prompts": [
+        "Does part number WPW10130695 usually ship okay?"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Great, thank you. I found it: 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Great, thank you. I found it: 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "What is the best part for fixing leaking then?"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Great, thank you. I found it: 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Do you know which parts other people use?"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hmm and electric connection box on the dishwasher?"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use to fix my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "I found it! It's 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Great, thank you. I found it: 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hello I am trying to figure out what part to use for my leaky dishwasher"
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Great, thank you. I found it: 2213222N414."
+      ],
+      "valid_description": ""
+    },
+    {
+      "prompts": [
+        "Hmm, what's the best part for fixing leaking?"
+      ],
+      "valid_description": ""
+    }
+  ]
+}

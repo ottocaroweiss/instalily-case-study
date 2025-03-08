@@ -1,8 +1,9 @@
 import time
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from dataclasses import asdict
 import re
+import hashlib
 
 from scraping.AbstractScraper import AbstractScraper
 from scraping.itemclasses import (
@@ -504,8 +505,8 @@ class PartScraper(AbstractScraper):
             logging.info(f"Inserting total of {len(collected)} Q&As into DB.")
             self.db.save_part_qnas(questions)
         return questions
-
-    def _parse_qna_page(self, container_css: str) -> (List[PartQnAItem], str):
+    
+    def _parse_qna_page(self, container_css: str) -> Tuple[List[PartQnAItem], str]:
         container = self.get_item(container_css, self.url)
         if not container:
             return [], ""
@@ -530,11 +531,13 @@ class PartScraper(AbstractScraper):
                 answer_box = div.select_one("div.qna__ps-answer__msg div.js-searchKeys")
                 answer = answer_box.get_text(strip=True) if answer_box else ""
 
+                unique_str = f"{self.manufacturer_id.upper()}{question_text}{model_number}{answer}"
+                qna_id = int(hashlib.md5(unique_str.encode()).hexdigest(), 16) % (10 ** 8)  # Generate an 8-digit hash
                 q_item = PartQnAItem(
-                    qna_id=None,  # let DB auto-increment
-                    manufacturer_id=self.part_item.manufacturer_id,
+                    qna_id=qna_id,
+                    manufacturer_id=self.part_item.manufacturer_id.upper(),
                     question=question_text,
-                    model_number=model_number,
+                    model_number=model_number.upper(),
                     answer=answer
                 )
                 results.append(q_item)
@@ -543,7 +546,7 @@ class PartScraper(AbstractScraper):
                 logging.error(f"Error parsing Q&A block: {ex}")
         return results, combined_str.strip()
     
-    def _parse_current_page_stories(self, container_css: str) -> (List[PartReviewStoryItem], str):
+    def _parse_current_page_stories(self, container_css: str) -> Tuple[List[PartReviewStoryItem], str]:
         container = self.get_item(container_css, self.url)
         blocks = container.select("div.repair-story")
         results = []
@@ -553,8 +556,10 @@ class PartScraper(AbstractScraper):
             instr_el = div.select_one("div.repair-story__instruction .js-searchKeys")
             title_str = title_el.get_text(strip=True) if title_el else ""
             text_str = instr_el.get_text(strip=True) if instr_el else ""
+            unique_str = f"{self.manufacturer_id.upper()}{title_str}{text_str}"
+            story_id = int(hashlib.md5(unique_str.encode()).hexdigest(), 16) % (10 ** 8)  # Generate an 8-digit hash
             st = PartReviewStoryItem(
-                story_id=None,
+                story_id=story_id,
                 manufacturer_id=self.manufacturer_id or "",
                 title=title_str,
                 text=text_str
@@ -563,7 +568,7 @@ class PartScraper(AbstractScraper):
             combined_str += f"{title_str} {text_str} "
         return results, combined_str.strip()
     
-    def _parse_current_page_reviews(self) -> (List[PartReviewItem], str):
+    def _parse_current_page_reviews(self) -> Tuple[List[PartReviewItem], str]:
         container = self.get_item(".js-resultsRenderer[data-event-target='Customer Review']", self.url)
         blocks = container.select("div.pd__cust-review__submitted-review")
         results = []
@@ -573,16 +578,17 @@ class PartScraper(AbstractScraper):
             text_el = div.select_one("div.js-searchKeys")
             header = header_el.get_text(strip=True) if header_el else ""
             text = text_el.get_text(strip=True) if text_el else ""
+            unique_str = f"{self.manufacturer_id.upper()}{header}{text}"
+            review_id = int(hashlib.md5(unique_str.encode()).hexdigest(), 16) % (10 ** 8)  # Generate an 8-digit hash
             r_item = PartReviewItem(
-                review_id=None,
-                manufacturer_id=self.manufacturer_id or "",
+                review_id=review_id,
+                manufacturer_id=self.manufacturer_id.upper() or "",
                 header=header,
                 text=text
             )
             results.append(r_item)
             combined_str += f"{header} {text} "
         return results, combined_str.strip()
-
 
     def __str__(self):
         part_item_dict = asdict(self.part_item)

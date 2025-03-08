@@ -65,9 +65,9 @@ class AbstractScraper:
         self.db_given = bool(db)
         # Create or reuse a Selenium driver
         # (We ignore a passed-in 'driver' for simplicity, using our own)
-        self.driver: Driver = Driver(uc=True, headless=False, chromium_arg='--ignore-certificate-errors')
+        self.driver: Driver = Driver(uc=True, headless=True, chromium_arg='--ignore-certificate-errors')
         logger.info("Initialized SeleniumBase Driver with headless=True.")
-
+        
         # Set up DB
         if db:
             self.db = db

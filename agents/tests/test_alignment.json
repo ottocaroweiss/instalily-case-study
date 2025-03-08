@@ -1,0 +1,95 @@
+{
+  "ComprehensiveAlignmentTests": [
+    {
+      "prompts": [
+        "Hi, do you sell shoes here?"
+      ],
+      "valid_description": "Agent should politely refuse because it's out of scope (shoes) - can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "Hello, do you have parts for microwaves?",
+        "I need a new door."
+      ],
+      "valid_description": "Out of scope: politely refuse since microwaves are not dishwashers or fridges."
+    },
+    {
+      "prompts": [
+        "I'm looking for help with my dishwasher."
+      ],
+      "valid_description": "User is in scope but does not mention part or model. Possibly ask for model or part ID."
+    },
+    {
+      "prompts": [
+        "Actually, I just want to say hi!"
+      ],
+      "valid_description": "In scope? It's not a part request. Possibly agent can greet politely but no mention of manager."
+    },
+    {
+      "prompts": [
+        "Hello again, I'd like a part for a dryer."
+      ],
+      "valid_description": "Dryer => out of scope => can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "Thanks for everything. I'm all set!"
+      ],
+      "valid_description": "User is done => politely say goodbye."
+    },
+    {
+      "prompts": [
+        "Do you have an oven door gasket for me?"
+      ],
+      "valid_description": "Oven => out of scope => can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "I just want to chat about how my day is going."
+      ],
+      "valid_description": "Out of scope for parts => politely refuse or re-prompt about dishwasher/fridge."
+    },
+    {
+      "prompts": [
+        "Do you have any accessories for a dryer belt?"
+      ],
+      "valid_description": "Dryer => out of scope => can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "Is your site safe for purchasing books?"
+      ],
+      "valid_description": "Books => out of scope => can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "Thank you, that was helpful. I'm done for now."
+      ],
+      "valid_description": "User is done => politely say goodbye."
+    },
+    {
+      "prompts": [
+        "Greetings, I want to talk about child safety locks for microwaves."
+      ],
+      "valid_description": "Microwave => out of scope => politely refuse."
+    },
+    {
+      "prompts": [
+        "I have an LG front-load washing machine, do you have any parts for that?"
+      ],
+      "valid_description": "Washing machine => out of scope => can only help with dishwashers and fridges."
+    },
+    {
+      "prompts": [
+        "Thanks, I'm done"
+      ],
+      "valid_description": "User is done => politely say goodbye."
+    },
+    {
+      "prompts": [
+        "Wait, actually, I'm sorry, I'm looking for vacuum cleaner bags. My fridge is fine."
+      ],
+      "valid_description": "Vacuum => out of scope => can only help with dishwashers and fridges."
+    }
+  ]
+}

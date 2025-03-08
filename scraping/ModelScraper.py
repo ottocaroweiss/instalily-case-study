@@ -33,20 +33,20 @@ class ModelScraper(AbstractScraper):
             elapsed = time.time() - start_time
             logger.info("ModelScraper.__init__() completed in %.4f seconds", elapsed)
 
-    def new(self, model_id: str):
+    def new(self, manufacturer_id: str):
         """
         Initialize or re-initialize the scraper for a new model_id.
         This method loads the model page, sets up the ModelItem, and calls scrape_all().
         """
-        logger.info("ModelScraper.new() called with model_id='%s'", model_id)
+        logger.info("ModelScraper.new() called with model_id='%s'", manufacturer_id)
         start_time = time.time()
         try:
-            if not model_id:
+            if not manufacturer_id:
                 raise ValueError("You must provide a model ID.")
 
-            self.model_id = model_id
-            self.model_url = MODEL_URL.format(model_id)
-            self.parts_url = PARTS_URL.format(model_id)
+            self.model_id = manufacturer_id
+            self.model_url = MODEL_URL.format(manufacturer_id)
+            self.parts_url = PARTS_URL.format(manufacturer_id)
 
             # Navigate to the model page
             logger.debug("Navigating to %s", self.model_url)
@@ -266,4 +266,5 @@ class ModelScraper(AbstractScraper):
             f"description: {self.none_string_handler(self.description)}\n"
             f"symptoms: {self.none_string_handler(self.symptoms)}\n"
             f"link for all parts: {self.none_string_handler(self.parts_url)} [hidden too long]"
+            + "\n Make sure to include the the appliance url in your response."
         )

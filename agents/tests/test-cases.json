@@ -1,0 +1,23 @@
+{
+  "default-session": [
+    {
+      "prompts": [
+        "How can I install part number PS11752778?"
+      ],
+      "valid_description": "Should provide a step by step guide and a link to a page."
+    },
+    {
+      "prompts": [
+        "I am looking at PS10065979, what's the price?",
+        "Is this part compatible with my WDT780SAEM1 model?"
+      ],
+      "valid_description": "Price should be provided ~40$ and the model is compatible with the part."
+    },
+    {
+      "prompts": [
+        "The ice maker on my Whirlpool fridge is not working. How can I fix it?"
+      ],
+      "valid_description": "Should ask for the model number and provide a link to the troubleshooting guide."
+    }
+  ]
+}

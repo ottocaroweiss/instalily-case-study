@@ -7,11 +7,9 @@ import sqlite3
 import atexit
 from typing import Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from tqdm import tqdm
 # Load environment variables from .env
 from dotenv import load_dotenv
 load_dotenv()
-from concurrent.futures import thread
 # External libraries
 from langchain_community.tools import tool
 from langchain_community.docstore.document import Document
@@ -247,7 +245,7 @@ def search_parts_of_an_appliance(appliance_id: str, query: str) -> str:
 
 
 
-@tool(description="Semantically search reviews, stories, and customer support text on a specific part id (commonly starts with PS). Make sure to use the id of the part and not the model. Args: manufacturer_id and a query. Returns string or 'NO SEARCH'.")
+@tool(description="Semantically search reviews, stories, and customer support text on a specific part id (commonly starts with PS). Make sure to use the id of the part and not the model. Please make your query at least 4 words long. Args: manufacturer_id and a query. Returns string or 'NO SEARCH'.")
 def search_all_customer_text_on_individual_part_tool(manufacturer_id: str, query: str) -> str:
     start_time = time.time()
     logger.info(f"Tool search_all_customer_text_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', query='{query}'")
@@ -259,7 +257,7 @@ def search_all_customer_text_on_individual_part_tool(manufacturer_id: str, query
     top_k = 5
 
     if manufacturer_id not in PART_USER_TEXT_INDEXES:
-        _build_part_user_text_index(manufacturer_id, force_rebuild=False)
+        _build_part_user_text_index(manufacturer_id, force_rebuild=True)
     
     index = PART_USER_TEXT_INDEXES[manufacturer_id]
     results = index.similarity_search(query, k=top_k)
@@ -273,7 +271,7 @@ def search_all_customer_text_on_individual_part_tool(manufacturer_id: str, query
     return "\n".join(lines)
 
 
-@tool(description="Semantic search in customer support only for a single part. Use this for sepecific or general questions that are not about the product. Args: manufacturer_id, question, k(opt). Returns snippet or 'NO SEARCH'.")
+@tool(description="Semantic search in customer support only for a single part. Use this for sepecific or general questions that are not about the product. Args: manufacturer_id, question, k(opt).  Please make your query at least 4 words long. Returns snippet or 'NO SEARCH'.")
 def search_customer_support_on_individual_part_tool(manufacturer_id: str, question: str, k: str = "3") -> str:
     start_time = time.time()
     logger.info(f"Tool search_customer_support_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', question='{question}', k='{k}'")
@@ -316,22 +314,35 @@ def get_part_by_id(manufacturer_id: str) -> str:
         part_scraper.new(manufacturer_id=manufacturer_id)
         return str(part_scraper)
     except Exception as e:
-        logger.error(f"Error in get_part_by_id: {e}")
-        return "INVALID PART ID"
+        try:
+            model_scraper = MODEL_SCRAPER()
+            model_scraper.new(manufacturer_id=manufacturer_id)
+            return str(model_scraper)
+        except:
+            logger.error(f"Error in get_part_by_id: {e}")
+            return "INVALID PART ID"
     finally:
         elapsed = time.time() - start_time
         logger.info(f"Tool get_part_by_id completed in {elapsed:.4f} sec")
 
 
-@tool(description="Retrieve all details on a specific appliance (dishwasher or refrigerator) by manufactuer_id. Returns a string or 'INVALID APPLIANCE ID'.")
-def get_appliance_by_id(manufactuer_id: str) -> str:
+@tool(description="Given a dishwasher or refrigerator id, Rrtrieve details about the specific appliance (dishwasher or refrigerator). Returns a string or 'INVALID APPLIANCE ID'.")
+def get_appliance_by_id(manufacturer_id: str) -> str:
     start_time = time.time()
-    logger.info(f"Tool get_appliance_by_id called with model_id='{manufactuer_id}'")
+    logger.info(f"Tool get_appliance_by_id called with model_id='{manufacturer_id}'")
     try:
         model_scraper = MODEL_SCRAPER()
-        model_scraper.new(manufacturer_id=manufactuer_id)
+        model_scraper.new(manufacturer_id=manufacturer_id)
         return str(model_scraper)
-    except:
+    except Exception as e:
+        """        try:
+            part_scraper = PART_SCRAPER()
+            part_scraper.new(manufacturer_id=manufacturer_id)
+            return str(part_scraper)
+        except:
+            logger.error(f"Error in get_part_by_id: {e}")
+            return "INVALID APPLIANCE ID"""
+        logger.error(f"E{e}")
         return "INVALID APPLIANCE ID"
     finally:
         elapsed = time.time() - start_time

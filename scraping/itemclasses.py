@@ -40,7 +40,6 @@ class PartReviewStoryItem:
     text: Optional[str] = None
 
 
-
 @dataclass
 class PartQnAItem:
     """
