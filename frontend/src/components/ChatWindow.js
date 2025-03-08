@@ -5,7 +5,7 @@ import { getAIMessage } from "../api/api";
 
 function ChatWindow() {
   const defaultMessage = [
-    { role: "assistant", content: "Welcome! I am your **PartSelector Support Agent**. How can I help you today?" }
+    { role: "assistant", content: "Welcome! I am your **PartSelector Support Agent**, specializing in **Dishwashers and Refrigerators**. How can I help you today?" }
   ];
 
   const [messages, setMessages] = useState(defaultMessage);
@@ -44,7 +44,9 @@ function ChatWindow() {
       setLoading(true);
       // Call API & set assistant message
       const newMessage = await getAIMessage(input);
+      console.log("NEW Message:", newMessage);
       setMessages(prevMessages => [...prevMessages, newMessage]);
+
       setLoading(false);
     }
   };
@@ -133,6 +135,7 @@ function ChatWindow() {
         <form className="input-area"
           onSubmit={(e) => {
             e.preventDefault();
+            if (loading) return;
             if (input.trim()) {
               handleSend(input);
             }

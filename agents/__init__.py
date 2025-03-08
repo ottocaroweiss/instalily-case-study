@@ -7,7 +7,6 @@ from typing import Dict
 from fastapi.responses import StreamingResponse
 from agents.main_agent import MainAgent
 from agents.my_tools import (
-    search_all_parts_tool,
     search_all_customer_text_on_individual_part_tool,
     search_customer_support_on_individual_part_tool,
     get_part_by_id,
@@ -85,7 +84,7 @@ def chat_endpoint(req: ChatRequest):
     main_agent: MainAgent = session["main_agent"]
 
     main_reply = main_agent.run(req.user_input)
-    main_reply = main_reply.replace("\n\n", "\n")
+    logging.info(f"CONVERSATION THUS FAR: {main_agent.conversation}")
     
     return {
         "session_id": session_id,

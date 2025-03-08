@@ -11,7 +11,7 @@ from tqdm import tqdm
 # Load environment variables from .env
 from dotenv import load_dotenv
 load_dotenv()
-
+from concurrent.futures import thread
 # External libraries
 from langchain_community.tools import tool
 from langchain_community.docstore.document import Document
@@ -178,23 +178,30 @@ def _build_part_user_text_index(manufacturer_id: str, force_rebuild: bool = Fals
         return
 
     logger.info(f"[PartUserTextIndex] Building fresh index for {manufacturer_id} ...")
-    db = DatabaseHandler()
-    reviews = db.get_part_reviews(manufacturer_id)
-    stories = db.get_part_review_stories(manufacturer_id)
-    qnas = db.get_part_qnas(manufacturer_id)
+
+    part_scraper = PART_SCRAPER()
+    try:
+        part_scraper.new(manufacturer_id=manufacturer_id)
+        part_scraper.scrape_all()
+        part_reviews = part_scraper.reviews
+        part_stories = part_scraper.stories
+        part_qnas = part_scraper.questions
+    except:
+        logger.warning(f"Part Scraper failed to scrape for manufacturer-id={manufacturer_id}.")
+        return "FAILURE: Are you sure you provided the part id and not the model id?"
 
     docs = []
-    for rv in reviews:
+    for rv in part_reviews:
         text = f"[ReviewHeader]: {rv.header or ''}\n[ReviewText]: {rv.text or ''}"
         meta = {"type": "review", "review_id": rv.review_id}
         docs.append(Document(page_content=text, metadata=meta))
 
-    for st in stories:
+    for st in part_stories:
         text = f"[StoryTitle]: {st.title or ''}\n[StoryText]: {st.text or ''}"
         meta = {"type": "story", "story_id": st.story_id}
         docs.append(Document(page_content=text, metadata=meta))
 
-    for qq in qnas:
+    for qq in part_qnas:
         text = f"[Question]: {qq.question or ''}\n[Answer]: {qq.answer or ''}"
         meta = {"type": "qna", "qna_id": qq.qna_id}
         docs.append(Document(page_content=text, metadata=meta))
@@ -231,22 +238,134 @@ def search_parts_of_an_appliance(appliance_id: str, query: str) -> str:
     logger.info(f"Tool search_parts_by_appliance_id called with appliance_id='{appliance_id}'")
     try:
         model_scraper = MODEL_SCRAPER()
-        model_scraper.new(appliance_id)
-        part_ids = model_scraper._scrape_part_ids(query=query)
-        response_str = ""
-        with ProcessPoolExecutor(max_workers=os.cpu_count() - 2) as executor:
-            futures = {executor.submit(_scrape_new_data_into_main_db, part_id): part_id for part_id in part_ids}
-            with tqdm(total=len(part_ids), desc="Processing gather_items") as pbar:
-                for fut in as_completed(futures):
-                    manufacturer_id, part_item  = fut.result()
-                    response_str += "\n" + str(part_item)
-                    pbar.update(1)
-                    logger.info(f"Scraped part_id: {manufacturer_id}")
-        return response_str
+        model_scraper.new(manufacturer_id=appliance_id)
+        return model_scraper.search_parts(query=query)
     finally:
         elapsed = time.time() - start_time
         logger.info(f"Tool scrape_model_symptoms completed in {elapsed:.4f} sec")
 
+
+
+
+@tool(description="Semantically search reviews, stories, and customer support text on a specific part id (commonly starts with PS). Make sure to use the id of the part and not the model. Args: manufacturer_id and a query. Returns string or 'NO SEARCH'.")
+def search_all_customer_text_on_individual_part_tool(manufacturer_id: str, query: str) -> str:
+    start_time = time.time()
+    logger.info(f"Tool search_all_customer_text_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', query='{query}'")
+    if not manufacturer_id:
+        return "FAILURE: You did not provide a manufacturer id."
+    query = query.strip()
+    if not query:
+        return "FAILURE: You did not provide a query."
+    top_k = 5
+
+    if manufacturer_id not in PART_USER_TEXT_INDEXES:
+        _build_part_user_text_index(manufacturer_id, force_rebuild=False)
+    
+    index = PART_USER_TEXT_INDEXES[manufacturer_id]
+    results = index.similarity_search(query, k=top_k)
+    if not results:
+        return "NO SEARCH"
+
+    lines = []
+    for i, doc in enumerate(results):
+        typ = doc.metadata.get("type", "?")
+        lines.append(f"{i} - {typ}:\n{doc.page_content}")
+    return "\n".join(lines)
+
+
+@tool(description="Semantic search in customer support only for a single part. Use this for sepecific or general questions that are not about the product. Args: manufacturer_id, question, k(opt). Returns snippet or 'NO SEARCH'.")
+def search_customer_support_on_individual_part_tool(manufacturer_id: str, question: str, k: str = "3") -> str:
+    start_time = time.time()
+    logger.info(f"Tool search_customer_support_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', question='{question}', k='{k}'")
+    try:
+        question = question.strip()
+        if not question:
+            return "NO SEARCH"
+        top_k = int(k) if k else 3
+
+        if manufacturer_id not in PART_USER_TEXT_INDEXES:
+            _build_part_user_text_index(manufacturer_id, force_rebuild=True)
+
+        index = PART_USER_TEXT_INDEXES[manufacturer_id]
+        results = index.similarity_search(question, k=top_k)
+        if not results:
+            return "NO SEARCH"
+
+        filtered = [r for r in results if r.metadata.get("type") == "qna"]
+        if not filtered:
+            return "NO SEARCH"
+
+        lines = []
+        for doc in filtered:
+            snippet = doc.page_content[:100].replace("\n", " ")
+            lines.append(f"QnA => {snippet}...")
+        return "\n".join(lines)
+    finally:
+        elapsed = time.time() - start_time
+        logger.info(f"Tool search_customer_support_on_individual_part_tool completed in {elapsed:.4f} sec")
+
+###############################################################################
+# 4) Database Tools
+###############################################################################
+@tool(description="Retrieve all details on a specific part by the id. Returns a string or 'INVALID PART ID'. Arg is manufacturer_id.")
+def get_part_by_id(manufacturer_id: str) -> str:
+    start_time = time.time()
+    logger.info(f"Tool get_part_by_id called with manufacturer_id='{manufacturer_id}'")
+    try:
+        part_scraper = PART_SCRAPER()
+        part_scraper.new(manufacturer_id=manufacturer_id)
+        return str(part_scraper)
+    except Exception as e:
+        logger.error(f"Error in get_part_by_id: {e}")
+        return "INVALID PART ID"
+    finally:
+        elapsed = time.time() - start_time
+        logger.info(f"Tool get_part_by_id completed in {elapsed:.4f} sec")
+
+
+@tool(description="Retrieve all details on a specific appliance (dishwasher or refrigerator) by manufactuer_id. Returns a string or 'INVALID APPLIANCE ID'.")
+def get_appliance_by_id(manufactuer_id: str) -> str:
+    start_time = time.time()
+    logger.info(f"Tool get_appliance_by_id called with model_id='{manufactuer_id}'")
+    try:
+        model_scraper = MODEL_SCRAPER()
+        model_scraper.new(manufacturer_id=manufactuer_id)
+        return str(model_scraper)
+    except:
+        return "INVALID APPLIANCE ID"
+    finally:
+        elapsed = time.time() - start_time
+        logger.info(f"Tool get_appliance_by_id completed in {elapsed:.4f} sec")
+
+
+@tool(description="Check if a part and model are compatible. Must provide both fields. Returns 'true' or 'false'.")
+def check_model_part_compatibility(part_id: str, appliance_id: str) -> str:
+    start_time = time.time()
+    logger.info(f"Tool check_compatibility called with part_select_id='{part_id}', model_id='{appliance_id}'")
+    try:
+        is_compatible = PartScraper.checkCompatibility(part_id, appliance_id)
+        return "true" if is_compatible else "false"
+    finally:
+        elapsed = time.time() - start_time
+        logger.info(f"Tool check_compatibility completed in {elapsed:.4f} sec")
+
+
+@tool(description="Scrape an appliance's symptoms page (via url) and return a detailed list of parts for a symptom. "
+"DO NOT USE UNLESS YOU HAVE ALREADY SCRAPED THE APPLICATION MODEL PAGE. Args: url(str). Returns a string.")
+def scrape_model_symptoms(url: str) -> str:
+    start_time = time.time()
+    logger.info(f"Tool scrape_model_symptoms called with url='{url}'")
+    try:
+        sym_scraper = SYMPTOM_SCRAPER()
+        sym_scraper.new(url=url)
+        return sym_scraper.symptoms_string
+    finally:
+        elapsed = time.time() - start_time
+        logger.info(f"Tool scrape_model_symptoms completed in {elapsed:.4f} sec")
+
+###############################################################################
+# NOT CURRENTLY USED: Tools/Functions for reference
+###############################################################################
 
 @tool(description=(
     "Fallback semantic search across parted-out fields (name, description, fixes). "
@@ -280,7 +399,7 @@ def search_all_parts_tool(
         if name.strip():
             name_results = index.similarity_search(
                 name.strip(),
-                k=10,
+                k=1000,
                 filter={"field": "name"}
             )
             combined_results.extend(name_results)
@@ -329,130 +448,6 @@ def search_all_parts_tool(
     finally:
         elapsed = time.time() - start_time
         logger.info(f"Tool search_all_parts_tool completed in {elapsed:.4f} sec")
-
-
-@tool(description="Semantically search reviews, stories, and customer support text on a specific part id. Args: manufacturer_id and a query. Returns string or 'NO SEARCH'.")
-def search_all_customer_text_on_individual_part_tool(manufacturer_id: str, query: str) -> str:
-    start_time = time.time()
-    logger.info(f"Tool search_all_customer_text_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', query='{query}'")
-    try:
-        query = query.strip()
-        if not query:
-            return "NO SEARCH"
-        top_k = 5
-
-        if manufacturer_id not in PART_USER_TEXT_INDEXES:
-            _build_part_user_text_index(manufacturer_id, force_rebuild=False)
-
-        index = PART_USER_TEXT_INDEXES[manufacturer_id]
-        results = index.similarity_search(query, k=top_k)
-        if not results:
-            return "NO SEARCH"
-
-        lines = []
-        for i, doc in enumerate(results):
-            typ = doc.metadata.get("type", "?")
-            lines.append(f"{i} - {typ}:\n{doc.page_content}")
-        return "\n".join(lines)
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool search_all_customer_text_on_individual_part_tool completed in {elapsed:.4f} sec")
-
-
-@tool(description="Semantic search in customer support only for a single part. Args: manufacturer_id, question, k(opt). Returns snippet or 'NO SEARCH'.")
-def search_customer_support_on_individual_part_tool(manufacturer_id: str, question: str, k: str = "3") -> str:
-    start_time = time.time()
-    logger.info(f"Tool search_customer_support_on_individual_part_tool called with manufacturer_id='{manufacturer_id}', question='{question}', k='{k}'")
-    try:
-        question = question.strip()
-        if not question:
-            return "NO SEARCH"
-        top_k = int(k) if k else 3
-
-        if manufacturer_id not in PART_USER_TEXT_INDEXES:
-            _build_part_user_text_index(manufacturer_id, force_rebuild=False)
-
-        index = PART_USER_TEXT_INDEXES[manufacturer_id]
-        results = index.similarity_search(question, k=top_k)
-        if not results:
-            return "NO SEARCH"
-
-        filtered = [r for r in results if r.metadata.get("type") == "qna"]
-        if not filtered:
-            return "NO SEARCH"
-
-        lines = []
-        for doc in filtered:
-            snippet = doc.page_content[:100].replace("\n", " ")
-            lines.append(f"QnA => {snippet}...")
-        return "\n".join(lines)
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool search_customer_support_on_individual_part_tool completed in {elapsed:.4f} sec")
-
-###############################################################################
-# 4) Database Tools
-###############################################################################
-@tool(description="Retrieve all details on a specific part by the id. Returns a string or 'INVALID PART ID'. Arg is manufacturer_id.")
-def get_part_by_id(manufacturer_id: str) -> str:
-    start_time = time.time()
-    logger.info(f"Tool get_part_by_id called with manufacturer_id='{manufacturer_id}'")
-    try:
-        part_scraper = PART_SCRAPER()
-        part_scraper.new(manufacturer_id)
-        return str(part_scraper)
-    except Exception as e:
-        logger.error(f"Error in get_part_by_id: {e}")
-        return "INVALID PART ID"
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool get_part_by_id completed in {elapsed:.4f} sec")
-
-
-@tool(description="Retrieve all details on a specific appliance (dishwasher or refrigerator) by manufactuer_id. Returns a string or 'INVALID APPLIANCE ID'.")
-def get_appliance_by_id(manufactuer_id: str) -> str:
-    start_time = time.time()
-    logger.info(f"Tool get_appliance_by_id called with model_id='{manufactuer_id}'")
-    try:
-        model_scraper = MODEL_SCRAPER()
-        model_scraper.new(manufactuer_id)
-        return str(model_scraper)
-    except:
-        return "INVALID APPLIANCE ID"
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool get_appliance_by_id completed in {elapsed:.4f} sec")
-
-
-@tool(description="Check if a part and model are compatible. Must provide both fields. Returns 'true' or 'false'.")
-def check_model_part_compatibility(part_id: str, appliance_id: str) -> str:
-    start_time = time.time()
-    logger.info(f"Tool check_compatibility called with part_select_id='{part_id}', model_id='{appliance_id}'")
-    try:
-        is_compatible = PartScraper.checkCompatibility(part_id, appliance_id)
-        return "true" if is_compatible else "false"
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool check_compatibility completed in {elapsed:.4f} sec")
-
-
-@tool(description="Scrape an appliance's symptoms page (via url) and return a detailed list of parts for a symptom. "
-"DO NOT USE UNLESS YOU HAVE ALREADY SCRAPED THE APPLICATION MODEL PAGE. Args: url(str). Returns a string.")
-def scrape_model_symptoms(url: str) -> str:
-    start_time = time.time()
-    logger.info(f"Tool scrape_model_symptoms called with url='{url}'")
-    try:
-        sym_scraper = SYMPTOM_SCRAPER()
-        sym_scraper.new(url)
-        return sym_scraper.symptoms_string
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"Tool scrape_model_symptoms completed in {elapsed:.4f} sec")
-
-###############################################################################
-# NOT CURRENTLY USED: Tools/Functions for reference
-###############################################################################
-
 
 MAIN_DB_FILE = "scraper_data.sqlite"
 
@@ -510,7 +505,6 @@ def search_parts_by_appliance_id(
     model_scraper = MODEL_SCRAPER()
     model_scraper.new(model_id=appliance_id)
     scraped_ids  =  model_scraper._scrape_part_ids()
-    """    
     from tqdm import tqdm
     with ProcessPoolExecutor(max_workers=os.cpu_count() - 2) as executor:
         futures = {executor.submit(_scrape_new_data_into_main_db, part_id): part_id for part_id in scraped_ids}
@@ -519,7 +513,6 @@ def search_parts_by_appliance_id(
                 result = fut.result()
                 logger.info(f"Scraped part_id: {result}")
                 pbar.update(1)
-    """
     
     logger.info(f"Scraped part_ids: {scraped_ids}")
 

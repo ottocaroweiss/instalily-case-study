@@ -149,18 +149,22 @@ class ModelScraper(AbstractScraper):
         start_time = time.time()
         page = 1
         if query:
-            part_url = f"{self.parts_url}/?SearchTerm={query}?search={{}}"
+            part_url = f"{self.parts_url}/?SearchTerm={query.replace(' ', '%20')}"
         else:
-            part_url = f"{self.parts_url}/?search={{}}"
+            part_url = f"{self.parts_url}/?start={{}}"
+        logger.info("Scraping parts from URL=%s", part_url)
         all_ids = set()
         popup_clicked = False
         while True:
-            if page > 1:
+            if query:
+                page_url = part_url
+            elif page > 1:
                 page_url = part_url.format(page)
             else:
                 page_url = self.parts_url
             try:
                 parts: PartItem = self.get_items("div.mega-m__part", page_url, parser=self._parse_part_block)
+                
                 if not parts and page == 1:
                     logger.warning("No parts found for model_id='%s' at URL=%s", self.model_id, self.parts_url)
                     return ""
@@ -174,7 +178,8 @@ class ModelScraper(AbstractScraper):
                         break
                     self.click_popup()
                     popup_clicked = True
-                
+                if query:
+                    break
                 logger.info("Found %d parts: %s", len(ids), ids)
                 page += 1
                 logger.info(f"ModelScraper._scrape_parts() scraped page {page}.")
@@ -183,15 +188,15 @@ class ModelScraper(AbstractScraper):
                 break
         elapsed = time.time() - start_time
         logger.info("ModelScraper._scrape_parts_and_store() completed in %.4f seconds", elapsed)
+        if query:
+            return "\n".join([str(part) for part in parts])
         return list(all_ids)
-    
-    def _scrape_parts_query(self, query) -> PartItem:
-        """
-        Scrape the part page for a single part_select_id.
-        """
-        self.parts_url + "/?SearchTerm=" + query
 
-
+    def search_parts(self, query: str) -> list[str]:
+        """
+        Search for parts by name. 
+        """
+        return self._scrape_part_ids(query)
 
     def _parse_part_block(self, part_div) -> PartItem:
         """
@@ -245,7 +250,7 @@ class ModelScraper(AbstractScraper):
                 symptom_description = desc_el.text.strip() if desc_el else ""
                 lines.append(f"{i}. {symptom_url}\n{symptom_description}\n")
 
-            return "\n".join(lines)
+            return "(links below provide lists of symptoms, you may call get_symptom_parts on them to get corresponding parts)" + "\n".join(lines)
         finally:
             elapsed = time.time() - start_time
             logger.info("ModelScraper._scrape_symptoms() completed in %.4f seconds", elapsed)

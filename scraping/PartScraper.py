@@ -9,7 +9,6 @@ from scraping.itemclasses import (
     PartItem, PartReplacementItem, PartReviewItem, PartReviewStoryItem, PartQnAItem
 )
 from scraping.database import DatabaseHandler
-from scraping.ModelScraper import ModelScraper
 
 # Configure logging
 logging.basicConfig(
@@ -36,14 +35,15 @@ class PartScraper(AbstractScraper):
             logging.info(f"Initializing PartScraper with link={link} manufacturer_id={manufacturer_id}")
             super().__init__(start_url=link)
             logging.info(f"Started driver at URL: {link}")
+            self.url = link
         elif manufacturer_id:
             super().__init__(manufacturer_id=manufacturer_id)
-            self.url = PART_SEARCH.format(manufacturer_id=manufacturer_id)
+            self.url = PART_SEARCH.format(manufacturer_id)
             logging.info(f"Started driver with manufacturer_id: {manufacturer_id}")
         else:
             raise ValueError("Must provide either link, or manufacturer_id")
 
-        self.url = self.driver.current_url
+        
         self.manufacturer_id = manufacturer_id
 
         # (from original code) If part in DB, load it; else create new PartItem
@@ -65,32 +65,28 @@ class PartScraper(AbstractScraper):
                     manufacturer_id=self.manufacturer_id,
                     url=self.url
                 )
-        self.reviews = []
-        self.questions = []
-        self.stories = []
+            self.scrape_all()
 
 
-    def new(self, url, manufacturer_id):
+    def new(self, url=None, manufacturer_id=None):
         """
         A method to handle "resetting" or creating a new part scraping context,
         after __init__ is called with a db. 
         """
         logging.info(f"new() called with url={url}, manufacturer_id={manufacturer_id}")
-        if url:
-            self.driver.get(url)
-            logging.info(f"Driver navigated to: {url}")
-            self.soup = self.set_soup(url)
-            self.part_item = PartItem(url=url)
+        if url and not manufacturer_id:
+            logging.info(f"Initializing PartScraper with link={url} manufacturer_id={manufacturer_id}")
+            super().__init__(start_url=url)
+            logging.info(f"Started driver at URL: {url}")
         elif manufacturer_id:
-            self.driver.get(url)
-            logging.info(f"Driver navigated to: {url}")
-            self.soup = self.set_soup(url)
+            super().__init__(manufacturer_id=manufacturer_id)
+            self.url = PART_SEARCH.format(manufacturer_id)
+            self.driver.get(self.url)
+            logging.info(f"Started driver with manufacturer_id: {manufacturer_id}")
         else:
-            raise ValueError("Must provide either link or manufacturer_id")
+            raise ValueError("Must provide either link, or manufacturer_id")
 
-        self.url = self.driver.current_url
         self.manufacturer_id = manufacturer_id
-
         existing_part = self.db.get_part(self.manufacturer_id)
         logging.info(f"Existing part in DB? {bool(existing_part)}")
         if existing_part:
@@ -100,26 +96,21 @@ class PartScraper(AbstractScraper):
                 self._scrape_part_select_id()
         else:
             if url:
-                logging.info("Part not found in DB; creating a new PartItem from URL.")
                 self.part_item = PartItem(url=self.url)
                 self._scrape_manufacturer_id()
                 time.sleep(1)
             else:
-                logging.info("Part not found in DB; creating a new PartItem from manufacturer_id.")
                 self.part_item = PartItem(
                     manufacturer_id=self.manufacturer_id,
                     url=self.url
                 )
-        self.reviews = []
-        self.questions = []
-        self.stories = []
-
+            self.scrape_all()
 
 
     # ---------------------------------------------------------
     # OPTIONAL: Full scrape_all if you want to force everything
     # ---------------------------------------------------------
-    def scrape_all(self) -> PartItem:
+    def scrape_all(self, includeComments = False) -> PartItem:
         """
         Scrape ALL fields for this part, forcibly, and save to DB.
         """
@@ -156,11 +147,15 @@ class PartScraper(AbstractScraper):
         if replacements_list:
             logging.info(f"Storing {len(replacements_list)} part replacements into DB ...")
             self.db.save_part_replacements(replacements_list)
-
+        if includeComments:
+            logging.info("Scraping reviews and stories...")
+            if not self.reviews:
+                reviews = self.reviews
+            if not self.stories:
+                stories = self.stories
+            if not self.questions:
+                questions = self.questions
         # Also forcibly get stories & reviews
-        self._scrape_stories()
-        self._scrape_reviews()
-        self._scrape_questions()
 
         return self.part_item
 
@@ -266,58 +261,32 @@ class PartScraper(AbstractScraper):
             val = self._scrape_availability()
             self.part_item.availability = val
         return self.part_item.availability
-    
+
+
     @property
-    def category(self) -> Optional[str]:
-        return None  # Placeholder, not fully implemented
-        if not self.part_item.category:
-            logging.info("Property 'category' not found; scraping category...")
-            self.part_item.category = self._scrape_category()
-        return self.part_item.category
+    def reviews(self) -> List[PartReviewItem]:
+        db_reviews = self.db.get_part_reviews(self.manufacturer_id)
+        if not db_reviews:
+            logging.info("Property 'reviews' not found; scraping reviews...")
+            return self._scrape_reviews()
+        return db_reviews
 
-    # ---------------------------------------------------------
-    # REVIEWS & STORIES: property-based so we only scrape if needed
-    # ---------------------------------------------------------
+    @property
+    def stories(self) -> List[PartReviewStoryItem]:
+        db_stories = self.db.get_part_review_stories(self.manufacturer_id)
+        if not db_stories:
+            logging.info("Property 'stories' not found; scraping stories...")
+            return self._scrape_stories()
+        return db_stories
+
+    @property
+    def questions(self) -> List[PartQnAItem]:
+        db_questions = self.db.get_part_qnas(self.manufacturer_id)
+        if not db_questions:
+            logging.info("Property 'reviews' not found; scraping reviews...")
+            self.reviews = self._scrape_questions()
+        return db_questions
     
-    def get_reviews(self) -> List[PartReviewItem]:
-        logging.info("Requesting part reviews from DB or by scraping if none exist...")
-        if self.reviews:
-            return self.reviews
-        existing = self.db.get_part_reviews(self.manufacturer_id)
-        if existing:
-            logging.info(f"Found {len(existing)} reviews in DB.")
-            self.reviews = existing
-            return existing
-        self._scrape_reviews()
-        self.reviews = self.db.get_part_reviews(self.manufacturer_id)
-        return self.reviews
-
-    def get_stories(self) -> List[PartReviewStoryItem]:
-        logging.info("Requesting part review stories from DB or by scraping if none exist...")
-        if self.stories:
-            return self.stories
-        existing = self.db.get_part_review_stories(self.manufacturer_id)
-        if existing:
-            logging.info(f"Found {len(existing)} stories in DB.")
-            self.stories = existing
-            return existing
-        self._scrape_stories()
-        self.stories = self.db.get_part_review_stories(self.manufacturer_id)
-        return self.stories
-
-    def get_questions(self) -> List[PartQnAItem]:
-        logging.info("Requesting part Q&As from DB or by scraping if none exist...")
-        if self.questions:
-            return self.questions
-        existing = self.db.get_part_qnas(self.manufacturer_id)
-        if existing:
-            logging.info(f"Found {len(existing)} Q&As in DB.")
-            self.questions = existing
-            return existing
-        self._scrape_questions()
-        self.questions = self.db.get_part_qnas(self.manufacturer_id)
-        return self.questions
-
     # -------------------------------------------------
     # PRIVATE SCRAPE METHODS
     # -------------------------------------------------
@@ -336,10 +305,6 @@ class PartScraper(AbstractScraper):
                                  parser=lambda el: el.text.strip()) == "In Stock"
         return self.part_item.availability
     
-    def _scrape_category(self):
-        logging.info(f"Scraping 'category' from URL: {self.url}")
-        # This is a no-op in your code, but you could fill it out if needed.
-        return None
 
     def _scrape_part_select_id(self):
         logging.info(f"Scraping 'part_select_id' from URL: {self.url}")
@@ -458,51 +423,48 @@ class PartScraper(AbstractScraper):
                 items.append(c)
             data["replaced_parts"] = items
         return data
-
+    
     def _scrape_reviews(self):
         logging.info(f"Scraping 'reviews' for manufacturer_id={self.manufacturer_id}")
+        collected = set()
+        reviews = []
         while True:
-            page_reviews = self._parse_current_page_reviews()
-            if page_reviews:
-                logging.info(f"Found {len(page_reviews)} reviews on this page; saving to DB.")
-                self.reviews.extend(page_reviews)
-                self.db.save_part_reviews(page_reviews)
-            ok = self.click(
+            page_reviews, combined_str = self._parse_current_page_reviews()
+            new_reviews = [r for r in page_reviews if combined_str not in collected]
+            reviews.extend(new_reviews)
+            if new_reviews:
+                logging.info(f"Found {len(new_reviews)} new reviews on this page.")
+                collected.update(combined_str)
+            else:
+                logging.info("No new reviews found on this page. Stopping scrape.")
+                break
+            clicked_next = self.click(
                 self.url,
                 css_path=".js-resultsRenderer[data-event-target='Customer Review'] li.next:not(.disabled)"
             )
-            if not ok:
+            if not clicked_next:
                 logging.info("No more 'next' pagination for reviews.")
                 break
-
-    def _parse_current_page_reviews(self):
-        container = self.get_item(".js-resultsRenderer[data-event-target='Customer Review']", self.url)
-        if not container:
-            return []
-        blocks = container.select("div.pd__cust-review__submitted-review")
-        results = []
-        for div in blocks:
-            header_el = div.select_one("div.bold")
-            text_el = div.select_one("div.js-searchKeys")
-            header = header_el.get_text(strip=True) if header_el else ""
-            text = text_el.get_text(strip=True) if text_el else ""
-            r_item = PartReviewItem(
-                review_id=None,
-                manufacturer_id=self.manufacturer_id or "",
-                header=header,
-                text=text
-            )
-            results.append(r_item)
-        return results
+        if collected:
+            logging.info(f"Inserting total of {len(collected)} reviews into DB.")
+            self.db.save_part_reviews(reviews)
+        return reviews
 
     def _scrape_stories(self):
         logging.info(f"Scraping 'stories' for manufacturer_id={self.manufacturer_id}")
         container_css = ".js-resultsRenderer[data-event-target='Repair Story']"
+        collected = set()
+        stories = []
         while True:
-            items = self._parse_current_page_stories(container_css)
-            if items:
-                logging.info(f"Found {len(items)} stories on this page; saving to DB.")
-                self.db.save_part_review_stories(items)
+            items, combined_str = self._parse_current_page_stories(container_css)
+            new_stories = [s for s in items if combined_str not in collected]
+            stories.extend(new_stories)
+            if new_stories:
+                logging.info(f"Found {len(new_stories)} new stories on this page.")
+                collected.update(combined_str)
+            else:
+                logging.info("No new stories found on this page. Stopping scrape.")
+                break
             clicked_next = self.click(
                 self.url,
                 css_path=f"{container_css} ul.pagination.js-pagination li.next:not(.disabled)"
@@ -510,58 +472,46 @@ class PartScraper(AbstractScraper):
             if not clicked_next:
                 logging.info("No more 'next' pagination for stories.")
                 break
-
-    def _parse_current_page_stories(self, container_css: str):
-        container = self.get_item(container_css, self.url)
-        if not container:
-            return []
-        blocks = container.select("div.repair-story")
-        results = []
-        for div in blocks:
-            title_el = div.select_one("div.repair-story__title")
-            instr_el = div.select_one("div.repair-story__instruction .js-searchKeys")
-            title_str = title_el.get_text(strip=True) if title_el else ""
-            text_str = instr_el.get_text(strip=True) if instr_el else ""
-            st = PartReviewStoryItem(
-                story_id=None,
-                manufacturer_id=self.manufacturer_id or "",
-                title=title_str,
-                text=text_str
-            )
-            results.append(st)
-        return results
+        if collected:
+            logging.info(f"Inserting total of {len(collected)} stories into DB.")
+            self.db.save_part_review_stories(stories)
+        return stories
 
     def _scrape_questions(self):
         logging.info(f"Scraping 'questions' (Q&A) for manufacturer_id={self.manufacturer_id}")
         container_css = "div.js-resultsRenderer[id=QuestionsAndAnswersContent]"
-        collected = []
-
+        collected = set()
+        questions = []
         while True:
-            page_items = self._parse_qna_page(container_css)
-            if page_items:
-                logging.info(f"Found {len(page_items)} Q&As on this page.")
-                collected.extend(page_items)
-
-            # attempt next
+            page_items, combined_str = self._parse_qna_page(container_css)
+            new_questions = [q for q in page_items if combined_str not in collected]
+            questions.extend(new_questions)
+            if new_questions:
+                logging.info(f"Found {len(new_questions)} new Q&As on this page.")
+                collected.update(combined_str)
+            else:
+                logging.info("No new Q&As found on this page. Stopping scrape.")
+                break
             clicked_next = self.click(
                 url=self.url,
-                css_path=f"{container_css} ul.pagination.js-pagination li.next:not(.disabled)"
+                css_path=f"{container_css} ul.pagination.js-pagination li.next:not(.disabled)",
+                reset_soup=False
             )
             if not clicked_next:
                 logging.info("No more 'next' pagination for Q&A.")
                 break
-
-        # Now do one big insert
         if collected:
             logging.info(f"Inserting total of {len(collected)} Q&As into DB.")
-            self.db.save_part_qnas(collected)
+            self.db.save_part_qnas(questions)
+        return questions
 
-    def _parse_qna_page(self, container_css: str) -> List[PartQnAItem]:
+    def _parse_qna_page(self, container_css: str) -> (List[PartQnAItem], str):
         container = self.get_item(container_css, self.url)
         if not container:
-            return []
+            return [], ""
         qna_divs = container.select("div.js-dataContainer div.qna__question.js-qnaResponse")
         results = []
+        combined_str = ""
         for div in qna_divs:
             try:
                 q_box = div.select_one("div.js-searchKeys")
@@ -588,9 +538,51 @@ class PartScraper(AbstractScraper):
                     answer=answer
                 )
                 results.append(q_item)
+                combined_str += f"{question_text} {model_number} {answer} "
             except Exception as ex:
                 logging.error(f"Error parsing Q&A block: {ex}")
-        return results
+        return results, combined_str.strip()
+    
+    def _parse_current_page_stories(self, container_css: str) -> (List[PartReviewStoryItem], str):
+        container = self.get_item(container_css, self.url)
+        blocks = container.select("div.repair-story")
+        results = []
+        combined_str = ""
+        for div in blocks:
+            title_el = div.select_one("div.repair-story__title")
+            instr_el = div.select_one("div.repair-story__instruction .js-searchKeys")
+            title_str = title_el.get_text(strip=True) if title_el else ""
+            text_str = instr_el.get_text(strip=True) if instr_el else ""
+            st = PartReviewStoryItem(
+                story_id=None,
+                manufacturer_id=self.manufacturer_id or "",
+                title=title_str,
+                text=text_str
+            )
+            results.append(st)
+            combined_str += f"{title_str} {text_str} "
+        return results, combined_str.strip()
+    
+    def _parse_current_page_reviews(self) -> (List[PartReviewItem], str):
+        container = self.get_item(".js-resultsRenderer[data-event-target='Customer Review']", self.url)
+        blocks = container.select("div.pd__cust-review__submitted-review")
+        results = []
+        combined_str = ""
+        for div in blocks:
+            header_el = div.select_one("div.bold")
+            text_el = div.select_one("div.js-searchKeys")
+            header = header_el.get_text(strip=True) if header_el else ""
+            text = text_el.get_text(strip=True) if text_el else ""
+            r_item = PartReviewItem(
+                review_id=None,
+                manufacturer_id=self.manufacturer_id or "",
+                header=header,
+                text=text
+            )
+            results.append(r_item)
+            combined_str += f"{header} {text} "
+        return results, combined_str.strip()
+
 
     def __str__(self):
         part_item_dict = asdict(self.part_item)

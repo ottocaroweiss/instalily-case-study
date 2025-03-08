@@ -35,7 +35,7 @@
   white-space: pre-line;
   padding: 14px;
   margin: 2px 0;
-  border-radius: 10px;
+  border-radius: 0.8em;
   clear: both;
   font-size:  0.9em;;
   font-weight: 600;
@@ -86,6 +86,11 @@
   background: #e8851b;
   border-radius: 5em;
   width: 50vw;
+  font-weight: bold;
+  font-size: 1.2em;
+  color: white;
+  border-radius: 0.8em;
+  border-top-left-radius: 0;
 }
 
 .spinner {
@@ -139,8 +144,6 @@
   border: 1px solid #ccc;
 }
 
-
-
 .input-area button {
   padding: 10px 20px;
   border: none;
@@ -155,4 +158,66 @@
 .input-area:focus {
   outline-color: #337778;
   box-shadow: 0 0 0 2px rgba(232, 133, 27, 0.5);
+}
+
+
+/* Header styles */
+.assistant-message-container h1 {
+  font-size: 1.1em; 
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+.assistant-message-container h2 {
+  font-size: 1.1em;
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+.assistant-message-container h3 {
+  font-size: 1.1em;
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+.assistant-message-container h4,
+.assistant-message-container h5,
+.assistant-message-container h6 {
+  font-size: 1em;
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+
+/* List styles */
+.assistant-message-container ul,
+.assistant-message-container ol {
+  margin: 0.1em 0;
+  padding-left: 1.5em;
+}
+.assistant-message-container li {
+  margin: 0.3em 0;
+}
+
+/* Blockquote styles */
+.assistant-message-container blockquote {
+  border-left: 4px solid #ccc;
+  margin: 0.8em 0;
+  padding: 0.5em 1em;
+  background: #f9f9f9;
+  color: #555;
+  font-style: italic;
+}
+
+
+/* Horizontal rule styles */
+.assistant-message-container hr {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 1em 0;
+  width: 100%;
+}
+
+/* Bold and Italic text */
+.assistant-message-container strong {
+  font-weight: 700;
+}
+.assistant-message-container em {
+  font-style: italic;
 }

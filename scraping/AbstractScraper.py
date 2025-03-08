@@ -65,7 +65,7 @@ class AbstractScraper:
         self.db_given = bool(db)
         # Create or reuse a Selenium driver
         # (We ignore a passed-in 'driver' for simplicity, using our own)
-        self.driver: Driver = Driver(uc=True, headless=True, chromium_arg='--ignore-certificate-errors')
+        self.driver: Driver = Driver(uc=True, headless=False, chromium_arg='--ignore-certificate-errors')
         logger.info("Initialized SeleniumBase Driver with headless=True.")
 
         # Set up DB
@@ -175,6 +175,7 @@ class AbstractScraper:
             logger.debug(f"set_soup => driver.get({url})")
             self.driver.get(url)
         self.soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+        self.url = self.driver.current_url
         return self.soup
 
     def wait_for(self, css_path: str, clickable: bool = False):
@@ -264,7 +265,6 @@ class AbstractScraper:
         logger.info(f"click => url={url}, css_path={css_path}, reset_soup={reset_soup}")
         if reset_soup:
             self.set_soup(url)
-
         try:
             next_btn: WebElement = self.driver.find_element(By.CSS_SELECTOR, css_path)
         except (NoSuchElementException, TimeoutException):
