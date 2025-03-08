@@ -1,70 +1,55 @@
-# Getting Started with Create React App
+### To run frontend development server:
+<pre><code>npm start</code></pre>
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### To run backend:
+<pre><code>uvicorn agents:app --reload</code></pre>
 
-## Available Scripts
+### To run individual files:
+<pre><code>python -m [agents or scraping].[file].py </code></pre>
 
-In the project directory, you can run:
+#### My goal was to maximize relevant context retrieval for DeepSeekChat while minimizing response time.
+#### The asynchronous agent implementation seemed the best approach, but, after some debugging, I found FastApi's streaming endpoint is too slow and unreliable. I could be wrong though.
 
-### `npm start`
+#### I was hoping to build out and refine it a bit more, as I think the setup and approach is very scalable and structured.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+<pre><code>
+├── agents/                                  (Holds agent-related code & config)
+│   ├── __init__.py                          (Initializes the backend agents API with FastAPI)
+│   ├── .env                                 (Environment variables/config; gitignored)
+│   ├── main_agent.py                        (Primary agent code handling chat logic & tool usage)
+│   ├── my_tools.py                          (Collection of “tool” functions used by the agent)
+│   └── validation_agent.py                  (Utility/agent for verifying response accuracy - might need to be updated)
+│
+├── chroma_db/                               (Local storage for Chroma-based vector indexes, converted from SQL data)
+│
+├── frontend/                                (React front-end application, mostly the same)
+│   ├── node_modules/                        
+│   ├── public/                              
+│   ├── src/
+│   │   ├── api/                             (Front-end API call)
+│   │   ├── components/                      (ChatWindow.js and ChatWindow.css)
+│   │   ├── App.css                          (Global CSS)
+│   │   ├── App.js                           (Main React component)
+│   │   └── index.js                         (App entry point rendering to the DOM)
+│   ├── package-lock.json
+│   └── package.json
+│
+├── scraping/                               (Core scraping logic and RAG DB utilities)
+│   ├── scrape_all/
+│   │   └── scrapy/                          (Scrapy project, slower than Selenium approach)
+│   │       └── ...                         (Additional spider files, feeds)
+│   ├── PartSelect.com_Sitemap_CategoryPage… (Category sitemap)
+│   ├── scrape_cats.py                      (Script to scrape category or item pages)
+│   ├── __init__.py                         (Makes 'scraping' a Python package)
+│   ├── AbstractScraper.py                  (Base Selenium scraping class)
+│   ├── database_utils.py                   (Generates SQL from dataclasses)
+│   ├── database.py                         (DatabaseHandler for creating/upserting data in SQLite)
+│   ├── itemclasses.py                      (Dataclasses for Part, Model, Review, etc.)
+│   ├── ModelScraper.py                     (Scraper for model pages on PartSelect)
+│   ├── PartScraper.py                      (Scraper for individual part pages & data)
+│   └── SymptomScraper.py                   (Scraper for “symptom” pages suggesting parts)
+│
+├── README.md                               (Project documentation)
+├── requirements.txt                        (Python dependencies)
+└── scraper_data.sqlite                     (SQLite DB containing scraped data, used for Chroma db)
+</code></pre>
