@@ -27,6 +27,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    filename="llm.log",  # File where logs should be saved
+    filemode="a"       # Append mode
 )
 logger = logging.getLogger(__name__)
 
@@ -180,12 +182,12 @@ def _build_part_user_text_index(manufacturer_id: str, force_rebuild: bool = Fals
     part_scraper = PART_SCRAPER()
     try:
         part_scraper.new(manufacturer_id=manufacturer_id)
-        part_scraper.scrape_all()
+        part_scraper.scrape_all(includeComments=True)
         part_reviews = part_scraper.reviews
         part_stories = part_scraper.stories
         part_qnas = part_scraper.questions
-    except:
-        logger.warning(f"Part Scraper failed to scrape for manufacturer-id={manufacturer_id}.")
+    except Exception as e:
+        logger.warning(f"Part Scraper failed to scrape for manufacturer-id={manufacturer_id}: {e}")
         return "FAILURE: Are you sure you provided the part id and not the model id?"
 
     docs = []
@@ -295,8 +297,8 @@ def search_customer_support_on_individual_part_tool(manufacturer_id: str, questi
 
         lines = []
         for doc in filtered:
-            snippet = doc.page_content[:100].replace("\n", " ")
-            lines.append(f"QnA => {snippet}...")
+            snippet = doc.page_content
+            lines.append(f"QnA => {snippet}")
         return "\n".join(lines)
     finally:
         elapsed = time.time() - start_time
@@ -305,7 +307,7 @@ def search_customer_support_on_individual_part_tool(manufacturer_id: str, questi
 ###############################################################################
 # 4) Database Tools
 ###############################################################################
-@tool(description="Retrieve all details on a specific part by the id. Returns a string or 'INVALID PART ID'. Arg is manufacturer_id.")
+@tool(description="Given a specific part id, retrieve details about it. Returns a string or 'INVALID PART ID'. Arg is manufacturer_id.")
 def get_part_by_id(manufacturer_id: str) -> str:
     start_time = time.time()
     logger.info(f"Tool get_part_by_id called with manufacturer_id='{manufacturer_id}'")
@@ -326,8 +328,8 @@ def get_part_by_id(manufacturer_id: str) -> str:
         logger.info(f"Tool get_part_by_id completed in {elapsed:.4f} sec")
 
 
-@tool(description="Given a dishwasher or refrigerator id, Rrtrieve details about the specific appliance (dishwasher or refrigerator). Returns a string or 'INVALID APPLIANCE ID'.")
-def get_appliance_by_id(manufacturer_id: str) -> str:
+@tool(description="Given an appliance (dishwasher or refrigerator) id, retrieve details about the specific appliance (dishwasher or refrigerator). Returns a string or 'INVALID APPLIANCE ID'.")
+def get_refrigerator_or_dishwasher_by_id(manufacturer_id: str) -> str:
     start_time = time.time()
     logger.info(f"Tool get_appliance_by_id called with model_id='{manufacturer_id}'")
     try:
@@ -335,15 +337,13 @@ def get_appliance_by_id(manufacturer_id: str) -> str:
         model_scraper.new(manufacturer_id=manufacturer_id)
         return str(model_scraper)
     except Exception as e:
-        """        try:
+        try:
             part_scraper = PART_SCRAPER()
             part_scraper.new(manufacturer_id=manufacturer_id)
             return str(part_scraper)
         except:
             logger.error(f"Error in get_part_by_id: {e}")
             return "INVALID APPLIANCE ID"""
-        logger.error(f"E{e}")
-        return "INVALID APPLIANCE ID"
     finally:
         elapsed = time.time() - start_time
         logger.info(f"Tool get_appliance_by_id completed in {elapsed:.4f} sec")

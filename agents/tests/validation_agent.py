@@ -7,16 +7,15 @@ import json
 import os
 from typing import Union, List, Dict, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from langchain_deepseek.chat_models import ChatDeepSeek
-
+from langchain_deepseek import ChatDeepSeek
 from dotenv import load_dotenv
-load_dotenv()  # Looks for .env in current or parent directories
+load_dotenv()
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 llm_deepseek = ChatDeepSeek(
     model="deepseek-chat",
     max_retries=2,
+    api_key=DEEPSEEK_API_KEY
 )
 class ValidationAgent:
     """

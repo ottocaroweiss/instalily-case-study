@@ -86,7 +86,8 @@ class PartScraper(AbstractScraper):
             logging.info(f"Started driver with manufacturer_id: {manufacturer_id}")
         else:
             raise ValueError("Must provide either link, or manufacturer_id")
-
+        if "/Models/" in self.driver.current_url:
+            raise ValueError("This is a model URL; please provide a part URL.")
         self.manufacturer_id = manufacturer_id
         existing_part = self.db.get_part(self.manufacturer_id)
         logging.info(f"Existing part in DB? {bool(existing_part)}")
@@ -157,7 +158,7 @@ class PartScraper(AbstractScraper):
             if not self.questions:
                 questions = self.questions
         # Also forcibly get stories & reviews
-
+        
         return self.part_item
 
     # ---------------------------------------------------------
@@ -285,7 +286,7 @@ class PartScraper(AbstractScraper):
         db_questions = self.db.get_part_qnas(self.manufacturer_id)
         if not db_questions:
             logging.info("Property 'reviews' not found; scraping reviews...")
-            self.reviews = self._scrape_questions()
+            return self._scrape_questions()
         return db_questions
     
     # -------------------------------------------------
@@ -592,4 +593,4 @@ class PartScraper(AbstractScraper):
 
     def __str__(self):
         part_item_dict = asdict(self.part_item)
-        return "\n".join(f"{key}: {value}" for key, value in part_item_dict.items())
+        return "\n".join(f"{key}: {value}" for key, value in part_item_dict.items()) + "\n Make sure to include the the product url in your response."

@@ -13,26 +13,31 @@ logging.basicConfig(
     filename="llm.log",  # File where logs should be saved
     filemode="a"       # Append mode
 )
+import os
+
+from dotenv import load_dotenv
+load_dotenv()  # Looks for .env in current or parent directories
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
 from agents.my_tools import (
             # search_all_parts_tool,
             search_all_customer_text_on_individual_part_tool,
             search_customer_support_on_individual_part_tool,
+            search_parts_of_an_appliance,
             get_part_by_id,
-            get_appliance_by_id,
+            get_refrigerator_or_dishwasher_by_id,
             check_model_part_compatibility,
             scrape_model_symptoms,
-            search_parts_of_an_appliance
         )
 
 TOOLS = [
-            # search_all_parts_tool,
             search_all_customer_text_on_individual_part_tool,
             search_customer_support_on_individual_part_tool,
+            search_parts_of_an_appliance,
             get_part_by_id,
-            get_appliance_by_id,
+            get_refrigerator_or_dishwasher_by_id,
             check_model_part_compatibility,
             scrape_model_symptoms,
-            search_parts_of_an_appliance
         ]
 
 
@@ -56,7 +61,7 @@ class MainAgent:
 
         Most user requests involve either an appliance (dishwasher/refrigerator) or a part (part of said appliances). If don't know what the user is looking for or providing, clarify first. You may provide information on parts, models, compatibility, and symptoms, or anything else that would help the user. You are always given the user's query and any relevant context from previous interactions.
 
-        If they need help finding their model id, you may also provide them with the following two links:\n
+        If they need help finding their specific refrigerator/dishwasher id, you may also provide them with the following two links:\n
         [Find Your Dishwasher Model Number](https://www.partselect.com/Find-Your-Dishwasher-Model-Number/)
         [Find Your Refrigerator Model Number](https://www.partselect.com/Find-Your-Refrigerator-Model-Number/)
 
@@ -74,7 +79,7 @@ class MainAgent:
         2. If the user is done or just says 'thank you', you can politely say goodbye and mention that you are there if they need anymore help.\n
         """
 
-        self.with_tools_system_prompt = self.system_prompt + "\n You may also call on your tools to assist the user. Please make use of your tools when it makes sense, but do not mention them to the user. Try to get either a part or appliance ID from the user, and then use your tools to provide the user with the information they need. Use the search tools can answer a question. The process should usually be to ask the user for a part or appliance ID, then you can access speciifc symptoms or use the search tools to answer more questions. If you can't find the information, you can ask the user for more information or let them know you couldn't find the information they requested."
+        self.with_tools_system_prompt = self.system_prompt + "\n You may also call on your tools to assist the user. Please make use of your tools when it makes sense, but do not mention them to the user. Try to get either a part or appliance ID from the user, and then use your tools to provide the user with the information they need. Use the search tools can answer a question. The process should usually be to ask the user for a part id or a dishwaser/refrigerator ID, then you can access speciifc symptoms or use the search tools to answer more questions. If you can't find the information, you can ask the user for more information or let them know you couldn't find the information they requested."
         # Initialize the LLM
         llm_with_tools = ChatDeepSeek(model="deepseek-chat", max_retries=2)
         # Bind tools so LLM can produce structured calls
@@ -94,16 +99,14 @@ class MainAgent:
         Single helper method to invoke the LLM, optionally with or without tools.
         Also calls clean_response() on response.content and returns the full response object.
         """
-        possible_system_prompt = self.conversation[0].content
+        possible_system_prompt: str = self.conversation[0].content
+        if possible_system_prompt.startswith("You are a chat bot for PartSelect.com, "):
+            self.conversation = self.conversation[1:]
         if withTools:
-            if self.with_tools_system_prompt not in possible_system_prompt:
-                if possible_system_prompt == self.system_prompt:
-                    self.conversation.remove(self.conversation[0])
-                self.conversation.insert(0, SystemMessage(self.with_tools_system_prompt))
+            self.conversation.insert(0, SystemMessage(self.with_tools_system_prompt))
             response = self.llm_with_tools.invoke(self.conversation)
         else:
-            if self.system_prompt not in self.conversation[0].content:
-                self.conversation.insert(0, SystemMessage(self.system_prompt))
+            self.conversation.insert(0, SystemMessage(self.system_prompt))
             response = self.llm.invoke(self.conversation)
         response.content = self.clean_response(response.content)
         return response
@@ -141,7 +144,8 @@ class MainAgent:
             if self.conversation_context:
                 self.conversation.append(SystemMessage("CONVERSATION CONTEXT: \n" + self.conversation_context))
             self.conversation.append(HumanMessage(user_input))
-
+        else:
+            self.conversation.append(HumanMessage("RETRY: " + user_input))
         # Track the new messages (the user input is at index -1)
         # Make a local copy for any summarizer logic
 
@@ -150,9 +154,9 @@ class MainAgent:
             logger.info("Invoking LLM for the first pass.")
             response = self.get_response(withTools=True)
             logger.info("LLM response (first pass): %s", response.content)
-
+            if response.content:
             # Insert the LLM’s response so the next pass can see it
-            self.conversation.append(AIMessage(response.content))
+                self.conversation.append(AIMessage(response.content))
 
             # If the LLM made any tool calls, handle them
             if response.tool_calls:
@@ -184,14 +188,12 @@ class MainAgent:
                 # Second pass: ask LLM to incorporate tool results
                 logger.info("Invoking LLM for the second pass after tool calls.")
                 final_system_message ="The user has no knowledge of your tool use. Please continue the conversation naturally by following your system prompt. Please be concise, providing only the relevant information in your response."
-                if tools_called == ["get_appliance_by_id"] or tools_called == ["get_part_by_id"]:
-                    final_system_message += "If your rag agent has not provided information directly relevant to the question (only given basic info about an item), you may ask the user if they would like you to perform a wider search."
-                self.conversation.append(
-                    SystemMessage(final_system_message))
+                if tools_called == ["get_refrigerator_or_dishwasher_by_id"] or tools_called == ["get_part_by_id"]:
+                    final_system_message += "If your rag agent has not provided information directly relevant to the question (only given basic info about an item), you may ask the user if they would like you to perform a wider search. Please do not make anything up or provide false information. If you don't know the answer, it's better to tell the user that you're not sure or offer to look up more information."
+                self.conversation.append(SystemMessage(final_system_message))
                 final_response = self.get_response(withTools=False)
                 final_text = self.clean_response(final_response.content)
                 self.conversation.append(AIMessage(final_response.content))
-
             else:
                 # No tool calls, so the first pass is the final
                 final_text = self.clean_response(response.content)
